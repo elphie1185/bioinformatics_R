@@ -1,11 +1,11 @@
-##################################################
+###################################################
 #
-# Performing Quantitative RNAseq EdgeR
+# Performing Quantitative RNAseq DSeq
 #
 ##################################################
 
 # Which transcripts are differentially expressed?
-library(edgeR)
+library(DESeq2)
 library(magrittr)
 library(readr)
 library(forecats)
@@ -16,11 +16,11 @@ genes <- count_dataframe[["gene"]]
 count_dataframe[["gene"]] <- NULL
 count_matrix <- as.matrix(count_dataframe)
 rownames(count_matrix) <- genes
+pheno_data <- readr::read_table2( "./datasets/Chapter01/modencodefly_phenodata.txt")
 
-# specify the data of interest
+# specify the experiments of interes
 experiments_of_interest <- c("L1Larvae", "L2Larvae")
 columns_of_interest <- which( pheno_data[["stage"]] %in% experiments_of_interest ) 
-pheno_data <- readr::read_table2( "./datasets/Chapter01/modencodefly_phenodata.txt")
 
 # form the grouping factor
 grouping <- pheno_data[["stage"]][columns_of_interest] %>% 
@@ -29,12 +29,13 @@ grouping <- pheno_data[["stage"]][columns_of_interest] %>%
 # form the subset of count data
 counts_of_interest <-  count_matrix[,columns_of_interest]
 
-# create the dge object
-count_dge <- edgeR::DGEList(counts = counts_of_interest, group = grouping)
+# create the dseq object
+dds <- DESeqDataSetFromMatrix(countData = counts_of_interest,
+                              colData = grouping,
+                              design = ~ stage)
+
+# carry out the analysis
+dds <- DESeq(dds)
 
 # differential expression analysis
-design <- model.matrix(~ grouping)
-eset_dge <- edgeR::estimateDisp(count_dge, design)
-fit <- edgeR::glmQLFit(eset_dge, design)
-result <- edgeR::glmQLFTest(fit, coef=2)
-topTags(result)
+res <- results(dds, contrast=c("stage","L2Larvae","L1Larvae"))
